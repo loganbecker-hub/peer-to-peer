@@ -24,7 +24,7 @@
 #define IP_ADDRESS         "192.168.43.59"
 #define MAX_CONNECTIONS    3
 
-static volatile int s[MAX_CONNECTIONS];
+static volatile int s[MAX_CONNECTIONS] = {0};
 static volatile int it = 0;
 
 void *server_function1(void *arg){ // To pass in arguments See-> man pthread_create
@@ -32,8 +32,8 @@ void *server_function1(void *arg){ // To pass in arguments See-> man pthread_cre
   char client_response[256];
   int check;
 
-  int i = it;
-  it++;
+  int i = it; // Keep this for the socket recv and send functions
+  it++;       // Open space for the next thread. Solve this for if clients close a connection
 
   s[i] = *(int *)arg;
   free(arg);
@@ -59,13 +59,14 @@ void *server_function1(void *arg){ // To pass in arguments See-> man pthread_cre
          send(s[j], client_response, sizeof(client_response), 0);
        }
      }
-
    }
    else{
      close( (int)s[i]);
-     //exit(1);
+     s[i] = 0; // Reset the file descriptor for the socket
+     it = i;   // Assign the open space for the next thread.
+     printf("Client %d disconnected.\n", i);
+     pthread_exit(&i);
    }
-
   }
   return NULL;
 }
@@ -73,6 +74,7 @@ void *server_function1(void *arg){ // To pass in arguments See-> man pthread_cre
 int main(void){
   int s;
   int client_socket;
+  int peer_ip;
 
   s = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -81,7 +83,10 @@ int main(void){
   server_address.sin_port = htons(PORT);
   server_address.sin_addr.s_addr = inet_addr(IP_ADDRESS);
 
-  bind(s, (struct sockaddr *)&server_address, sizeof(server_address));
+  const struct sockaddr *address = (struct sockaddr *)&server_address;
+  socklen_t len = sizeof(server_address);
+
+  bind(s, address, len);
   listen(s, MAX_CONNECTIONS);
 
   pthread_t server_threads[MAX_CONNECTIONS];
@@ -94,8 +99,15 @@ int main(void){
 
       struct sockaddr_in ip_from_socket;
       socklen_t ip_len = sizeof(ip_from_socket);
-      /** Handle errors from 'z' **/
-      int z = getpeername(client_socket, (struct sockaddr *)&ip_from_socket,(socklen_t *)&ip_len);
+
+      struct sockaddr *ip_addr = (struct sockaddr *)&ip_from_socket;
+      socklen_t *ip_addrlen = &ip_len;
+
+      peer_ip = getpeername(client_socket, ip_addr, ip_addrlen);
+      if(peer_ip == -1){
+        printf("Error getting Ip address for client: %d", client_socket);
+      }
+
       printf("Ip address connected: %s  ", inet_ntoa(ip_from_socket.sin_addr));
       printf("| Port %d\n", ntohs(ip_from_socket.sin_port));
     }
@@ -106,10 +118,12 @@ int main(void){
 
     int * client_number = malloc(sizeof(int));
     *client_number = client_socket;
+    int thread_id = 0;
     if(it < MAX_CONNECTIONS){
-      pthread_create(&server_threads[it], NULL, &server_function1, client_number);
-
-      /** I REMOVED THE VERIFCATION OF THE THREAD CREATION **/
+      thread_id = pthread_create(&server_threads[it], NULL, &server_function1, client_number);
+      if(thread_id != 0){
+        printf("Error creating a new thread for an incomming connection.\n");
+      }
     }
     else {
       free(client_number);
