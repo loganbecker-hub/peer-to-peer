@@ -22,7 +22,7 @@
 /** PARAMETERS FOR THE SERVER **/
 #define PORT               9002
 #define IP_ADDRESS         "192.168.43.59"
-#define MAX_CONNECTIONS    5
+#define MAX_CONNECTIONS    3
 
 static volatile int s[MAX_CONNECTIONS];
 static volatile int it = 0;
@@ -44,7 +44,8 @@ void *server_function1(void *arg){ // To pass in arguments See-> man pthread_cre
    if(check > 0){
      printf("Client %d Reply: %s", s[i]-4, client_response);
 
-     printf("i = %d\n", i);
+     /** Testing for max connections to the network **/
+     //printf("i = %d\n", i);
 
      /** Send data to the right side of the nodes **/
      for(int j = i+1; j < MAX_CONNECTIONS; j++){
@@ -90,6 +91,13 @@ int main(void){
     client_socket = accept(s, NULL, NULL);
     if( (client_socket >= 4) && (client_socket <= (MAX_CONNECTIONS+3)) ){
       printf("[+] A connection has been accepted!\n");
+
+      struct sockaddr_in ip_from_socket;
+      socklen_t ip_len = sizeof(ip_from_socket);
+      /** Handle errors from 'z' **/
+      int z = getpeername(client_socket, (struct sockaddr *)&ip_from_socket,(socklen_t *)&ip_len);
+      printf("Ip address connected: %s  ", inet_ntoa(ip_from_socket.sin_addr));
+      printf("| Port %d\n", ntohs(ip_from_socket.sin_port));
     }
     else{
       printf("A connection has been rejected!\n");
