@@ -31,7 +31,7 @@ void *server_function1(void *arg){ // To pass in arguments See-> man pthread_cre
   char client_message[256] = "Welcome to the network.\n";
   char client_response[256];
   int check;
-  
+
   int i = it;
   it++;
 
@@ -43,22 +43,22 @@ void *server_function1(void *arg){ // To pass in arguments See-> man pthread_cre
    check = recv(s[i], client_response, sizeof(client_response), 0);
    if(check > 0){
      printf("Client %d Reply: %s", s[i]-4, client_response);
-     
+
      printf("i = %d\n", i);
-     
+
      /** Send data to the right side of the nodes **/
      for(int j = i+1; j < MAX_CONNECTIONS; j++){
        send(s[j], client_response, sizeof(client_response), 0);
      }
-     
+
      /** Send data to the left side of the nodes **/
      /** i cannot be a negative number **/
      if(i != 0){
        for(int j = i-1; j >= 0; j--){
          send(s[j], client_response, sizeof(client_response), 0);
-       } 
+       }
      }
-   
+
    }
    else{
      close( (int)s[i]);
@@ -82,30 +82,32 @@ int main(void){
 
   bind(s, (struct sockaddr *)&server_address, sizeof(server_address));
   listen(s, MAX_CONNECTIONS);
-  
-  pthread_t server_threads[5];
-  
+
+  pthread_t server_threads[MAX_CONNECTIONS];
+
   while(1){
-  
+
     client_socket = accept(s, NULL, NULL);
-    if(client_socket >= 4){
+    if( (client_socket >= 4) && (client_socket <= (MAX_CONNECTIONS+3)) ){
       printf("[+] A connection has been accepted!\n");
     }
     else{
       printf("A connection has been rejected!\n");
+      close(client_socket);
     }
 
     int * client_number = malloc(sizeof(int));
     *client_number = client_socket;
-    if(it < 5){
+    if(it < MAX_CONNECTIONS){
       pthread_create(&server_threads[it], NULL, &server_function1, client_number);
 
       /** I REMOVED THE VERIFCATION OF THE THREAD CREATION **/
     }
     else {
+      free(client_number);
       printf("Max connections have been reached.\n");
     }
-    
+
   }
 
   return 0;
